@@ -13,15 +13,15 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Copy application files first
+COPY . .
+
 # Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Test that app can import without errors
 RUN python -c "import app; print('✓ App imports successfully')" 2>&1
-
-# Copy application
-COPY . .
 
 # Download model during build
 RUN python download_model.py
