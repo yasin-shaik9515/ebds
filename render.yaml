@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ebds
+    env: python
+    region: ohio
+    plan: free
+    buildCommand: python download_model.py
+    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9
+      - key: PORT
+        value: 10000

@@ -2,13 +2,22 @@ from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 import cv2
 import os
+import sys
+import logging
 from detector import EBDSDetector
 import threading
 import time
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode='threading')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 detector = None
 camera = None
 current_mode = 'drowsiness'
@@ -16,13 +25,22 @@ current_mode = 'drowsiness'
 def init_detector_and_camera():
     global detector, camera
     try:
+        logger.info("Initializing detector and camera...")
         detector = EBDSDetector()
+        logger.info("Detector initialized successfully")
+        
         camera = cv2.VideoCapture(0)
         if not camera.isOpened():
-            print("Warning: Camera not available")
+            logger.warning("Camera not available - running in demo mode")
             camera = None
+        else:
+            logger.info("Camera initialized successfully")
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        detector = None
+        camera = None
     except Exception as e:
-        print(f"Error initializing detector or camera: {e}")
+        logger.error(f"Error initializing detector or camera: {e}")
         detector = None
         camera = None
 
@@ -70,18 +88,27 @@ def gen_frames():
 def index():
     return render_template('index.html')
 
+@app.route('/health')
+def health():
+    """Health check endpoint for Render monitoring"""
+    return jsonify({
+        'status': 'ok',
+        'detector': 'ready' if detector else 'not available',
+        'camera': 'ready' if camera else 'not available'
+    }), 200
+
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/set_mode', methods=['POST'])
 def set_mode():
-    global current_mode
+    global current_mode, detector
     mode = request.json.get('mode')
     if mode in ['drowsiness', 'hci', 'attendance']:
         current_mode = mode
         # Reset attendance if switching to it
-        if mode == 'attendance':
+        if mode == 'attendance' and detector:
             detector.attendance_logged = False
             detector.attendance_counter = 0
         return jsonify(success=True, mode=current_mode)
@@ -91,4 +118,10 @@ if __name__ == '__main__':
     init_detector_and_camera()
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug)
+    
+    logger.info(f"Starting app on port {port}, debug={debug}")
+    try:
+        socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)
+    except Exception as e:
+        logger.error(f"Failed to start app: {e}")
+        sys.exit(1)
