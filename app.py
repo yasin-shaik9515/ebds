@@ -35,7 +35,7 @@ def init_detector_and_camera():
             camera = None
         else:
             logger.info("Camera initialized successfully")
-    except ImportError as e:
+    except (ImportError, OSError, EnvironmentError) as e:
         logger.warning(f"MediaPipe/OpenCV graphics libraries not available: {e}")
         logger.info("Running in demo mode without computer vision features")
         detector = None
