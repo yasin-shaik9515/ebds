@@ -1,0 +1,2 @@
+[build]
+nixPackages = ["libxcb", "libx11", "libxext", "libgl1", "libsm6", "libxrender1"]
