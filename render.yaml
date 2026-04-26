@@ -9,4 +9,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9
-        // The PYTHON_VERSION environment variable is used to specify the version of Python to use for the application. In this case, it is set to 3.9.
