@@ -1,6 +1,7 @@
 from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 import cv2
+import os
 from detector import EBDSDetector
 import threading
 import time
@@ -8,9 +9,22 @@ import time
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, async_mode='threading')
-detector = EBDSDetector()
-camera = cv2.VideoCapture(0)
+detector = None
+camera = None
 current_mode = 'drowsiness'
+
+def init_detector_and_camera():
+    global detector, camera
+    try:
+        detector = EBDSDetector()
+        camera = cv2.VideoCapture(0)
+        if not camera.isOpened():
+            print("Warning: Camera not available")
+            camera = None
+    except Exception as e:
+        print(f"Error initializing detector or camera: {e}")
+        detector = None
+        camera = None
 
 def status_worker():
     """Background worker to send status updates via SocketIO"""
@@ -23,7 +37,12 @@ def status_worker():
 latest_status = "Normal"
 
 def gen_frames():
-    global current_mode, latest_status
+    global current_mode, latest_status, detector, camera
+    if not detector or not camera:
+        yield (b'--frame\r\n'
+               b'Content-Type: text/plain\r\n\r\n' + b'Camera not available\r\n')
+        return
+        
     while True:
         success, frame = camera.read()
         if not success:
@@ -69,4 +88,7 @@ def set_mode():
     return jsonify(success=False), 400
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    init_detector_and_camera()
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug)
