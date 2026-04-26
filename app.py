@@ -35,8 +35,9 @@ def init_detector_and_camera():
             camera = None
         else:
             logger.info("Camera initialized successfully")
-    except FileNotFoundError as e:
-        logger.error(f"Model file not found: {e}")
+    except ImportError as e:
+        logger.warning(f"MediaPipe/OpenCV graphics libraries not available: {e}")
+        logger.info("Running in demo mode without computer vision features")
         detector = None
         camera = None
     except Exception as e:
@@ -57,8 +58,21 @@ latest_status = "Normal"
 def gen_frames():
     global current_mode, latest_status, detector, camera
     if not detector or not camera:
+        # Create a demo frame with status message
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(frame, "Demo Mode - No Camera Available", (50, 200), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        cv2.putText(frame, f"Mode: {current_mode}", (50, 250), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, f"Status: {latest_status}", (50, 280), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, "Deployed on Render", (50, 350), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+        
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
         yield (b'--frame\r\n'
-               b'Content-Type: text/plain\r\n\r\n' + b'Camera not available\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         return
         
     while True:
@@ -93,8 +107,10 @@ def health():
     """Health check endpoint for Render monitoring"""
     return jsonify({
         'status': 'ok',
-        'detector': 'ready' if detector else 'not available',
-        'camera': 'ready' if camera else 'not available'
+        'mode': 'demo' if not detector else 'full',
+        'detector': 'ready' if detector else 'not available (demo mode)',
+        'camera': 'ready' if camera else 'not available (demo mode)',
+        'message': 'App is running successfully on Render'
     }), 200
 
 @app.route('/video_feed')
