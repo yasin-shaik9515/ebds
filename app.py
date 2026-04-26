@@ -24,25 +24,31 @@ current_mode = 'drowsiness'
 
 def init_detector_and_camera():
     global detector, camera
+    
+    # Try to initialize detector (MediaPipe)
     try:
-        logger.info("Initializing detector and camera...")
+        logger.info("Initializing detector...")
         detector = EBDSDetector()
         logger.info("Detector initialized successfully")
-        
+    except (ImportError, OSError, EnvironmentError) as e:
+        logger.warning(f"MediaPipe graphics libraries not available: {e}")
+        logger.info("Running without face detection features")
+        detector = None
+    except Exception as e:
+        logger.error(f"Error initializing detector: {e}")
+        detector = None
+    
+    # Try to initialize camera (independent of detector)
+    try:
+        logger.info("Initializing camera...")
         camera = cv2.VideoCapture(0)
         if not camera.isOpened():
             logger.warning("Camera not available - running in demo mode")
             camera = None
         else:
             logger.info("Camera initialized successfully")
-    except (ImportError, OSError, EnvironmentError) as e:
-        logger.warning(f"MediaPipe/OpenCV graphics libraries not available: {e}")
-        logger.info("Running in demo mode without computer vision features")
-        detector = None
-        camera = None
     except Exception as e:
-        logger.error(f"Error initializing detector or camera: {e}")
-        detector = None
+        logger.error(f"Error initializing camera: {e}")
         camera = None
 
 def status_worker():
@@ -57,7 +63,7 @@ latest_status = "Normal"
 
 def gen_frames():
     global current_mode, latest_status, detector, camera
-    if not detector or not camera:
+    if not camera:
         # Create a demo frame with status message
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(frame, "Demo Mode - No Camera Available", (50, 200), 
@@ -74,20 +80,27 @@ def gen_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         return
-        
+    
+    # Camera is available
     while True:
         success, frame = camera.read()
         if not success:
             break
         else:
-            frame, status, ear = detector.process_frame(frame, mode=current_mode)
-            latest_status = status
+            if detector:
+                # Full processing with face detection
+                frame, status, ear = detector.process_frame(frame, mode=current_mode)
+                latest_status = status
+            else:
+                # Basic video streaming without processing
+                status = "Camera Active (No Face Detection)"
+                latest_status = status
             
             # Emit status via socketio
             socketio.emit('status_update', {'status': status, 'mode': current_mode})
             
             # Overlay status on frame
-            color = (0, 0, 255) if status == "Drowsy" else (0, 255, 0)
+            color = (0, 0, 255) if "Drowsy" in status else (0, 255, 0)
             cv2.putText(frame, f"Mode: {current_mode}", (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
             cv2.putText(frame, f"Status: {status}", (10, 60), 
@@ -105,12 +118,13 @@ def index():
 @app.route('/health')
 def health():
     """Health check endpoint for Render monitoring"""
+    mode = 'full' if detector and camera else 'camera-only' if camera else 'demo'
     return jsonify({
         'status': 'ok',
-        'mode': 'demo' if not detector else 'full',
-        'detector': 'ready' if detector else 'not available (demo mode)',
-        'camera': 'ready' if camera else 'not available (demo mode)',
-        'message': 'App is running successfully on Render'
+        'mode': mode,
+        'detector': 'ready' if detector else 'not available (no face detection)',
+        'camera': 'ready' if camera else 'not available',
+        'message': f'App is running in {mode} mode on Render'
     }), 200
 
 @app.route('/video_feed')
