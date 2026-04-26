@@ -1,14 +1,14 @@
 FROM python:3.12-slim
 
-# Install system dependencies for OpenCV and X11
+# Install system dependencies for OpenCV
 RUN apt-get update && apt-get install -y \
     libxcb1 \
     libx11-6 \
     libxext6 \
-    libgl1-mesa-glx \
     libsm6 \
     libxrender1 \
     libxkbcommon0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
