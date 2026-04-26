@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
-socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
+socketio = SocketIO(app, 
+                   async_mode='gevent',
+                   cors_allowed_origins="*",
+                   ping_timeout=60,
+                   ping_interval=25)
 detector = None
 camera = None
 current_mode = 'drowsiness'
