@@ -1,6 +1,7 @@
 from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 import cv2
+import numpy as np
 import os
 import sys
 import logging
