@@ -4,6 +4,6 @@ mediapipe==0.10.33
 numpy>=1.24.3
 flask-socketio==5.3.4
 eventlet==0.33.3
-scipy==1.11.4
+scipy>=1.11.4
 gunicorn==21.2.0
 python-dotenv==1.0.0
