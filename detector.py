@@ -4,7 +4,6 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
 from scipy.spatial import distance as dist
-import pyautogui
 import os
 
 class EBDSDetector:
@@ -39,11 +38,12 @@ class EBDSDetector:
         self.NOSE_TIP = 1
         
         # HCI Settings
+        self.screen_w, self.screen_h = 1920, 1080
         try:
+            import pyautogui
             self.screen_w, self.screen_h = pyautogui.size()
         except:
-            self.screen_w, self.screen_h = 1920, 1080
-        pyautogui.FAILSAFE = False
+            pass
 
     def calculate_ear(self, eye_landmarks):
         # eye_landmarks is a list of (x, y) tuples
@@ -98,6 +98,7 @@ class EBDSDetector:
                 cursor_x = np.interp(nose.x, (0.3, 0.7), (self.screen_w, 0))
                 cursor_y = np.interp(nose.y, (0.3, 0.7), (0, self.screen_h))
                 try:
+                    import pyautogui
                     pyautogui.moveTo(cursor_x, cursor_y, _pause=False)
                 except:
                     pass
